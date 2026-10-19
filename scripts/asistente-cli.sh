@@ -44,6 +44,6 @@ case "${1:-}" in
   config)     "${EDITOR:-nano}" "$ENVF" && systemctl restart "$SERVICIO" && echo "Configuración aplicada." ;;
   gmail)      conectar_gmail ;;
   respaldo)   cd "$APP" && runuser -u "$USUARIO" -- env CARPETA_DATOS="$DATOS" "$VENV/bin/python" -m asistente.respaldo "${2:-$DATOS/respaldo-$(date +%F).db}" ;;
-  actualizar) cp "$APP/instalar.sh" /tmp/instalar-asistente.sh && bash /tmp/instalar-asistente.sh ;;
+  actualizar) cp "$APP/instalar.sh" /tmp/instalar-asistente.sh && exec bash /tmp/instalar-asistente.sh ;;
   *)          echo "Uso: asistente {estado|logs|reiniciar|config|gmail|respaldo|actualizar}" ;;
 esac
