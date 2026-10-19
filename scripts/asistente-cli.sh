@@ -15,11 +15,24 @@ conectar_gmail() {
   echo "Necesitas una contraseña de aplicación: https://myaccount.google.com/apppasswords"
   read -r -p "Tu correo de Gmail: " usuario < /dev/tty
   usuario="${usuario//[[:space:]]/}"
-  read -r -s -p "Contraseña de aplicación (16 letras; no se verá en pantalla): " clave < /dev/tty
-  echo
-  clave="${clave//[[:space:]]/}"
-  if [[ -z "$usuario" || -z "$clave" ]]; then
-    echo "✖ Faltó el correo o la contraseña."; exit 1
+  if [[ -z "$usuario" ]]; then
+    echo "✖ Faltó el correo."; exit 1
+  fi
+  for _ in 1 2 3; do
+    echo "Escribe o pega la contraseña de aplicación (16 letras, con o sin espacios)."
+    echo "No se verá en pantalla mientras escribes; al terminar presiona Enter."
+    read -r -s -p "Contraseña de aplicación: " clave < /dev/tty
+    echo
+    clave="${clave//[[:space:]]/}"
+    if [[ ${#clave} -eq 16 ]]; then
+      echo "Recibí las 16 letras."
+      break
+    fi
+    echo "✖ Recibí ${#clave} letras y deben ser 16. Intenta otra vez."
+    clave=""
+  done
+  if [[ -z "$clave" ]]; then
+    echo "✖ No recibí la contraseña. Vuelve a correr: asistente gmail"; exit 1
   fi
   echo "Probando la conexión con Gmail..."
   if ! GM_U="$usuario" GM_P="$clave" "$VENV/bin/python" -c '
