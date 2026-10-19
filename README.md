@@ -4,7 +4,8 @@ Le escribes o le mandas una nota de voz, como a una persona, y te ayuda con:
 
 - **Recordatorios**, de una vez o que se repiten ("todos los lunes a las 8"). El aviso llega con tres botones: **Hecho**, **+1 hora** y **Mañana**.
 - **Lista de pendientes**: anotar, revisar y marcar como hechos.
-- **Resumen diario** a las 7:00 am con lo del día.
+- **Resumen diario** a las 7:00 am con lo del día y, si conectas Gmail, con los correos que esperan tu respuesta.
+- **Tu Gmail, solo lectura** (opcional): le preguntas por tus correos, `/correo` te dice qué espera respuesta y te avisa de inmediato si llega algo urgente.
 
 Funciona en hora de Bogotá y solo le responde a tu cuenta de Telegram.
 
@@ -41,6 +42,13 @@ Para probarlo, escríbele: *"recuérdame en 2 minutos probar el bot"*.
 
 La primera vez que arranca, el bot descarga el modelo de notas de voz (unos 500 MB). Mientras termina, las notas de voz pueden tardar. El texto funciona desde el primer momento.
 
+### Conectar Gmail (opcional)
+
+1. Crea una **contraseña de aplicación** en https://myaccount.google.com/apppasswords. Requiere la verificación en dos pasos. Ponle de nombre "asistente" y copia las 16 letras.
+2. En la consola del servidor corre `asistente gmail`, escribe tu correo y pega la contraseña. No se ve en pantalla. El comando prueba la conexión, la guarda y reinicia el bot.
+
+El bot solo **lee** tu correo: nunca envía, responde, borra ni marca nada como leído. Los correos se resumen con Claude sin acceso a ninguna acción, así que un correo malicioso no puede hacer que el bot haga algo. Para desconectarlo, borra las líneas `GMAIL_` con `asistente config`, o revoca la contraseña en tu cuenta de Google.
+
 ## 3. Cómo se usa
 
 Háblale normal:
@@ -52,6 +60,7 @@ Háblale normal:
 - "Anota cotizar paneles para el viernes"
 - "¿Qué tengo pendiente?" / "Ya hice lo de los paneles"
 - "Cambia lo del proveedor para las 10" / "Cancela lo de cerrar caja"
+- Con Gmail conectado: "¿Me escribió la notaría esta semana?" / "¿Llegó la factura de Claro?"
 
 Si no le dices la hora, usa estas: en la mañana 8:00, al mediodía 12:00, en la tarde 3:00 pm y en la noche 7:00 pm. Siempre te confirma la hora que eligió.
 
@@ -60,6 +69,7 @@ Si no le dices la hora, usa estas: en la mañana 8:00, al mediodía 12:00, en la
 | `/hoy` | Lo que te avisa hoy y tus pendientes |
 | `/recordatorios` | Todo lo programado |
 | `/pendientes` | La lista de pendientes |
+| `/correo` | Los correos que esperan tu respuesta (con Gmail conectado) |
 | `/ayuda` | Ejemplos |
 
 Sobre los botones del aviso:
@@ -76,6 +86,7 @@ Desde la consola del servidor:
 | `asistente logs` | Ver qué está pasando (Ctrl+C para salir) |
 | `asistente estado` | Ver si está corriendo |
 | `asistente config` | Cambiar la configuración; reinicia solo al guardar |
+| `asistente gmail` | Conectar o cambiar tu Gmail (solo lectura) |
 | `asistente respaldo` | Copia de tus recordatorios en `/opt/asistente/datos/` |
 | `asistente actualizar` | Instalar la última versión; conserva tu configuración |
 
@@ -92,6 +103,7 @@ Estas opciones están en `/opt/asistente/.env` y se cambian con `asistente confi
 | `RESUMEN_HORA` | Hora del resumen diario, por ejemplo `06:30`; `off` lo desactiva |
 | `WHISPER_MODELO` | `small` (recomendado), `base` (gasta menos RAM) u `off` (sin notas de voz) |
 | `ZONA_HORARIA` | `America/Bogota` por defecto |
+| `ALERTAS_CORREO_MIN` | Cada cuántos minutos busca correos urgentes (15 por defecto); `off` las apaga |
 
 ## 5. Costos y privacidad
 

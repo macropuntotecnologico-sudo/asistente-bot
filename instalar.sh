@@ -189,20 +189,9 @@ EOF
 }
 
 instalar_comando() {
-  cat > /usr/local/bin/asistente <<EOF
-#!/usr/bin/env bash
-# Atajos para administrar el asistente.
-set -euo pipefail
-case "\${1:-}" in
-  estado)     systemctl status $SERVICIO --no-pager ;;
-  logs)       journalctl -u $SERVICIO -f ;;
-  reiniciar)  systemctl restart $SERVICIO && echo "Reiniciado." ;;
-  config)     \${EDITOR:-nano} $ENVF && systemctl restart $SERVICIO && echo "Configuración aplicada." ;;
-  respaldo)   cd $APP && runuser -u $USUARIO -- env CARPETA_DATOS=$DATOS $VENV/bin/python -m asistente.respaldo "\${2:-$DATOS/respaldo-\$(date +%F).db}" ;;
-  actualizar) cp $APP/instalar.sh /tmp/instalar-asistente.sh && bash /tmp/instalar-asistente.sh ;;
-  *)          echo "Uso: asistente {estado|logs|reiniciar|config|respaldo|actualizar}" ;;
-esac
-EOF
+  sed -e "s#@APP@#$APP#g" -e "s#@VENV@#$VENV#g" -e "s#@DATOS@#$DATOS#g" \
+      -e "s#@ENVF@#$ENVF#g" -e "s#@USUARIO@#$USUARIO#g" -e "s#@SERVICIO@#$SERVICIO#g" \
+      "$APP/scripts/asistente-cli.sh" > /usr/local/bin/asistente
   chmod 755 /usr/local/bin/asistente
 }
 
@@ -267,6 +256,7 @@ Atajos en este servidor:
   asistente logs        ver qué está pasando
   asistente estado      ver si está corriendo
   asistente config      cambiar la configuración
+  asistente gmail       conectar tu Gmail (solo lectura)
   asistente respaldo    copia de seguridad de tus recordatorios
   asistente actualizar  instalar la última versión
 EOF

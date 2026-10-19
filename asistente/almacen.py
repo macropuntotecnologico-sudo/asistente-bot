@@ -29,6 +29,11 @@ CREATE TABLE IF NOT EXISTS pendientes (
     creado      TEXT NOT NULL,
     hecho_en    TEXT
 );
+
+CREATE TABLE IF NOT EXISTS estado (
+    clave  TEXT PRIMARY KEY,
+    valor  TEXT
+);
 """
 
 CAMPOS_RECORDATORIO = {"texto", "inicio", "proxima", "repeticion", "estado", "ultima_ocurrencia"}
@@ -131,4 +136,18 @@ class Almacen:
 
     def borrar_pendiente(self, id_: int) -> None:
         self._con.execute("DELETE FROM pendientes WHERE id = ?", (id_,))
+        self._con.commit()
+
+    # --- Estado interno (marcas del correo, etc.) ----------------------------------------
+
+    def leer_estado(self, clave: str) -> str | None:
+        fila = self._con.execute("SELECT valor FROM estado WHERE clave = ?", (clave,)).fetchone()
+        return fila["valor"] if fila else None
+
+    def guardar_estado(self, clave: str, valor: str) -> None:
+        self._con.execute(
+            "INSERT INTO estado (clave, valor) VALUES (?, ?)"
+            " ON CONFLICT(clave) DO UPDATE SET valor = excluded.valor",
+            (clave, valor),
+        )
         self._con.commit()

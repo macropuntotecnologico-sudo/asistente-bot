@@ -24,6 +24,13 @@ class Config:
     whisper_modelo: str | None
     carpeta_datos: Path
     nombre_usuario: str
+    gmail_usuario: str | None = None
+    gmail_clave_app: str | None = None
+    alertas_correo_min: int = 15
+
+    @property
+    def gmail_activo(self) -> bool:
+        return bool(self.gmail_usuario and self.gmail_clave_app)
 
     @property
     def ruta_db(self) -> Path:
@@ -65,6 +72,16 @@ def cargar(entorno: dict[str, str] | None = None) -> Config:
     if whisper.lower() in ("", "off", "no", "0"):
         whisper = None
 
+    gmail_usuario = e.get("GMAIL_USUARIO", "").strip() or None
+    gmail_clave = e.get("GMAIL_CLAVE_APP", "").replace(" ", "").strip() or None
+    if gmail_usuario and "@" not in gmail_usuario:
+        raise ErrorConfig("GMAIL_USUARIO debe ser un correo completo, por ejemplo tucorreo@gmail.com.")
+    texto_alertas = e.get("ALERTAS_CORREO_MIN", "15").strip().lower()
+    if texto_alertas in ("", "off", "no"):
+        texto_alertas = "0"
+    if not texto_alertas.isdigit():
+        raise ErrorConfig("ALERTAS_CORREO_MIN debe ser un número de minutos (0 u off para apagarlas).")
+
     return Config(
         telegram_token=e["TELEGRAM_TOKEN"].strip(),
         telegram_user_id=int(usuario) if usuario else None,
@@ -75,4 +92,7 @@ def cargar(entorno: dict[str, str] | None = None) -> Config:
         whisper_modelo=whisper,
         carpeta_datos=Path(e.get("CARPETA_DATOS", "/data").strip() or "/data"),
         nombre_usuario=e.get("NOMBRE_USUARIO", "").strip() or "tu jefe",
+        gmail_usuario=gmail_usuario,
+        gmail_clave_app=gmail_clave,
+        alertas_correo_min=int(texto_alertas),
     )

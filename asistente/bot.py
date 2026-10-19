@@ -8,6 +8,7 @@ import tempfile
 from datetime import time
 from pathlib import Path
 
+import anthropic
 from telegram import BotCommand, InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ChatAction
 from telegram.ext import (
@@ -21,6 +22,7 @@ from telegram.ext import (
 
 from .cerebro import Cerebro, ErrorCerebro
 from .config import Config
+from .correo import AnalistaCorreo, Buzon, ErrorCorreo
 from .programador import despachar_vencidos
 from .servicio import Servicio
 from .transcripcion import ErrorTranscripcion, Transcriptor
@@ -40,12 +42,16 @@ AYUDA = """Hola 👋 Soy tu asistente. Háblame normal, por texto o nota de voz:
 • "Anota cotizar paneles para el viernes"
 • "¿Qué tengo pendiente?" / "Ya hice lo de los paneles"
 • "Cambia lo del proveedor para las 10" / "Cancela lo del inventario"
-
+{ejemplos_correo}
 Atajos:
 /hoy — lo que te aviso hoy y tus pendientes
 /recordatorios — todo lo programado
 /pendientes — tu lista de pendientes
-/ayuda — este mensaje"""
+{atajo_correo}/ayuda — este mensaje"""
+
+EJEMPLOS_CORREO = """• "¿Me escribió la notaría esta semana?"
+• "¿Llegó la factura de Claro?"
+"""
 
 COMANDOS = [
     BotCommand("hoy", "Lo de hoy y tus pendientes"),
@@ -53,6 +59,10 @@ COMANDOS = [
     BotCommand("pendientes", "Tu lista de pendientes"),
     BotCommand("ayuda", "Ejemplos de lo que puedo hacer"),
 ]
+COMANDO_CORREO = BotCommand("correo", "Correos que esperan tu respuesta")
+
+ESTADO_UID = "correo_ultimo_uid"
+ESTADO_VALIDEZ = "correo_uidvalidity"
 
 
 def partir(texto: str, limite: int = LIMITE_TELEGRAM) -> list[str]:
@@ -85,7 +95,11 @@ class AsistenteBot:
         servicio: Servicio,
         cerebro: Cerebro,
         transcriptor: Transcriptor,
+        buzon: Buzon | None = None,
+        analista: AnalistaCorreo | None = None,
     ):
+        self.buzon = buzon
+        self.analista = analista
         self.config = config
         self.servicio = servicio
         self.cerebro = cerebro
@@ -113,6 +127,7 @@ class AsistenteBot:
         app.add_handler(CommandHandler("hoy", self._hoy, filters=dueno))
         app.add_handler(CommandHandler("recordatorios", self._recordatorios, filters=dueno))
         app.add_handler(CommandHandler("pendientes", self._pendientes, filters=dueno))
+        app.add_handler(CommandHandler("correo", self._correo, filters=dueno))
         app.add_handler(MessageHandler(dueno & filters.TEXT & ~filters.COMMAND, self._texto))
         app.add_handler(MessageHandler(dueno & (filters.VOICE | filters.AUDIO), self._voz))
         app.add_handler(CallbackQueryHandler(self._boton))
@@ -125,13 +140,19 @@ class AsistenteBot:
             app.job_queue.run_daily(
                 self._resumen_diario, time=time(hora.hour, hora.minute, tzinfo=self.config.zona)
             )
+        if self.buzon and self.analista and self.config.alertas_correo_min > 0:
+            app.job_queue.run_repeating(
+                self._alertas_correo, interval=self.config.alertas_correo_min * 60, first=60
+            )
         return app
 
     async def _al_iniciar(self, app: Application) -> None:
         if self.config.telegram_user_id is None:
             return
         try:
-            await app.bot.set_my_commands(COMANDOS)
+            await app.bot.set_my_commands(
+                [*COMANDOS[:3], COMANDO_CORREO, *COMANDOS[3:]] if self.buzon else COMANDOS
+            )
         except Exception:
             log.exception("No se pudo registrar el menú de comandos")
         if self.transcriptor.activo:
@@ -169,8 +190,36 @@ class AsistenteBot:
     async def _no_soportado(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.effective_message.reply_text("Por ahora entiendo texto y notas de voz.")
 
+    def texto_ayuda(self) -> str:
+        return AYUDA.format(
+            ejemplos_correo=EJEMPLOS_CORREO if self.buzon else "",
+            atajo_correo="/correo — correos que esperan tu respuesta\n" if self.buzon else "",
+        )
+
     async def _ayuda(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-        await self._responder(update, AYUDA)
+        await self._responder(update, self.texto_ayuda())
+
+    async def resumen_correo(self) -> str:
+        """Resumen de lo que espera respuesta en Gmail. Nunca lanza: devuelve el problema como texto."""
+        if not (self.buzon and self.analista):
+            return ("El correo no está conectado. En el servidor corre: asistente gmail")
+        try:
+            mensajes = await self.buzon.esperando_respuesta()
+            return await self.analista.resumir(mensajes)
+        except ErrorCorreo as e:
+            return f"⚠️ {e}"
+        except anthropic.APIError as e:
+            log.error("Claude no pudo resumir el correo: %s", e)
+            if "credit balance" in str(e).lower():
+                return "⚠️ Tu cuenta de Anthropic se quedó sin saldo; no pude resumir el correo."
+            return "⚠️ No pude resumir el correo en este momento."
+        except Exception:
+            log.exception("Falló el resumen del correo")
+            return "⚠️ No pude revisar el correo en este momento."
+
+    async def _correo(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        await update.effective_chat.send_action(ChatAction.TYPING)
+        await self._responder(update, await self.resumen_correo())
 
     async def _hoy(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await self._responder(update, self.servicio.texto_hoy())
@@ -269,7 +318,40 @@ class AsistenteBot:
             log.info("Avisos enviados: %s", enviados)
 
     async def _resumen_diario(self, context: ContextTypes.DEFAULT_TYPE) -> None:
-        await self._enviar(context, self.servicio.texto_resumen_diario())
+        texto = self.servicio.texto_resumen_diario()
+        if self.buzon and self.analista:
+            texto += "\n\n📧 Tu correo:\n" + await self.resumen_correo()
+        await self._enviar(context, texto)
+
+    async def _alertas_correo(self, context: ContextTypes.DEFAULT_TYPE) -> None:
+        """Revisa correos nuevos de la bandeja Principal y avisa solo de los urgentes."""
+        almacen = self.servicio.almacen
+        ultimo = almacen.leer_estado(ESTADO_UID)
+        validez = almacen.leer_estado(ESTADO_VALIDEZ)
+        try:
+            mensajes, nuevo_ultimo, nueva_validez = await self.buzon.nuevos(
+                int(ultimo) if ultimo else None, int(validez) if validez else None
+            )
+        except ErrorCorreo as e:
+            log.warning("Alertas de correo: %s", e)
+            return
+        except Exception:
+            log.exception("Falló la revisión de correos nuevos")
+            return
+        almacen.guardar_estado(ESTADO_UID, str(nuevo_ultimo))
+        almacen.guardar_estado(ESTADO_VALIDEZ, str(nueva_validez))
+        if not mensajes:
+            return
+        try:
+            urgentes = await self.analista.urgentes(mensajes)
+        except Exception as e:
+            log.error("No se pudo clasificar el correo nuevo: %s", e)
+            return
+        for mensaje, alerta in urgentes:
+            texto = f"🚨 Correo urgente: {alerta}"
+            if mensaje.enlace:
+                texto += f"\n{mensaje.enlace}"
+            await self._enviar(context, texto)
 
     async def _error(self, update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         log.error("Error procesando una actualización", exc_info=context.error)

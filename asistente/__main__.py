@@ -12,6 +12,7 @@ from . import config as configuracion
 from .almacen import Almacen
 from .bot import AsistenteBot
 from .cerebro import Cerebro
+from .correo import AnalistaCorreo, Buzon
 from .servicio import Servicio
 from .transcripcion import Transcriptor
 
@@ -34,10 +35,15 @@ def main() -> int:
     almacen = Almacen(cfg.ruta_db)
     servicio = Servicio(almacen, cfg.zona)
     cliente = anthropic.AsyncAnthropic(api_key=cfg.anthropic_api_key)
-    cerebro = Cerebro(cliente, cfg.claude_modelo, servicio, cfg.nombre_usuario)
+    buzon = analista = None
+    if cfg.gmail_activo:
+        buzon = Buzon(cfg.gmail_usuario, cfg.gmail_clave_app)
+        analista = AnalistaCorreo(cliente, cfg.claude_modelo, cfg.nombre_usuario)
+        logging.info("Gmail conectado (solo lectura): %s", cfg.gmail_usuario)
+    cerebro = Cerebro(cliente, cfg.claude_modelo, servicio, cfg.nombre_usuario, buzon=buzon)
     transcriptor = Transcriptor(cfg.whisper_modelo, cfg.carpeta_modelos)
 
-    app = AsistenteBot(cfg, servicio, cerebro, transcriptor).construir()
+    app = AsistenteBot(cfg, servicio, cerebro, transcriptor, buzon=buzon, analista=analista).construir()
     try:
         app.run_polling(allowed_updates=Update.ALL_TYPES)
     finally:
