@@ -1,0 +1,7 @@
+python-telegram-bot[job-queue]==22.8
+anthropic==1.14.0
+python-dateutil==2.9.0.post0
+faster-whisper==1.2.1
+# av 19 quitó un parámetro que faster-whisper 1.2.1 todavía usa
+av==18.1.0
+tzdata==2026.5

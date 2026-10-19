@@ -1,0 +1,17 @@
+services:
+  asistente:
+    build: .
+    image: asistente-telegram:latest
+    container_name: asistente-telegram
+    restart: unless-stopped
+    env_file: .env
+    volumes:
+      - datos:/data
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  datos:
