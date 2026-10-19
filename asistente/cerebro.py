@@ -143,6 +143,12 @@ class Cerebro:
         elif isinstance(e, anthropic.NotFoundError):
             log.error("Modelo no encontrado (%s): %s", self.modelo, e)
             mensaje = f"El modelo {self.modelo} no está disponible. Revisa CLAUDE_MODELO en el archivo .env."
+        elif isinstance(e, anthropic.BadRequestError) and "credit balance" in str(e).lower():
+            log.error("La cuenta de Anthropic no tiene saldo: %s", e)
+            mensaje = (
+                "Tu cuenta de Anthropic se quedó sin saldo. Cárgalo en platform.claude.com > Billing "
+                "y vuelve a escribirme. Mientras tanto, /hoy, /recordatorios y /pendientes sí funcionan."
+            )
         else:
             log.error("Error de la API de Anthropic: %s", e)
             mensaje = "No pude hablar con Claude en este momento. Intenta de nuevo en un rato."

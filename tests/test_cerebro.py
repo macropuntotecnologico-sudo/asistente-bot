@@ -117,6 +117,17 @@ async def test_error_de_clave(servicio):
 
 
 @pytest.mark.asyncio
+async def test_error_sin_saldo(servicio):
+    req = httpx.Request("POST", "https://api.anthropic.com/v1/messages")
+    error = anthropic.BadRequestError(
+        "Error code: 400 - Your credit balance is too low to access the Anthropic API.",
+        response=httpx.Response(400, request=req), body=None,
+    )
+    with pytest.raises(ErrorCerebro, match="sin saldo"):
+        await Cerebro(ClienteFalso(error), "m", servicio).responder("hola")
+
+
+@pytest.mark.asyncio
 async def test_error_despues_de_un_cambio_lo_advierte(servicio):
     cliente = ClienteFalso(
         respuesta(uso("t1", "anotar_pendiente", {"texto": "cotizar"}), stop="tool_use"),

@@ -13,7 +13,7 @@ Funciona en hora de Bogotá y solo le responde a tu cuenta de Telegram.
 ## 1. Antes de empezar
 
 1. **El bot.** Si todavía no lo tienes, créalo en Telegram con **@BotFather** (`/newbot`). Para ver el token de un bot que ya existe: `/mybots` > tu bot > *API Token*.
-2. **La clave de Claude.** Entra a **console.anthropic.com**, ve a *API Keys* y crea una clave. En *Billing* carga saldo. Te conviene poner un límite de gasto mensual en *Limits*.
+2. **La clave de Claude.** Entra a **platform.claude.com**, ve a *API Keys* y crea una clave. En *Billing* carga saldo. Te conviene poner un límite de gasto mensual en *Limits*.
 3. **Un servidor encendido siempre.** Lo recomendado es un contenedor LXC en Proxmox:
    - Plantilla **Debian 12**.
    - 1 CPU, **2 GB de RAM** y 8 GB de disco.

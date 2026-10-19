@@ -33,6 +33,14 @@ preguntar() {
   printf -v "$__var" '%s' "${respuesta:-$defecto}"
 }
 
+# preguntar_secreto "texto" variable: igual, pero sin mostrar lo que se pega.
+preguntar_secreto() {
+  local texto="$1" __var="$2" respuesta=""
+  read -r -s -p "$texto: " respuesta < /dev/tty || true
+  echo "(recibido, ${#respuesta} caracteres)" > /dev/tty
+  printf -v "$__var" '%s' "$respuesta"
+}
+
 json() { # json 'expresión python sobre d' < archivo_json
   python3 -c "import json,sys; d=json.load(sys.stdin); print($1)"
 }
@@ -84,7 +92,7 @@ instalar_python() {
 pedir_token() {
   local respuesta
   while true; do
-    preguntar "Pega el token de tu bot (te lo dio @BotFather)" TOKEN
+    preguntar_secreto "Pega el token de tu bot (te lo dio @BotFather; no se verá en pantalla)" TOKEN
     TOKEN="${TOKEN//[[:space:]]/}"
     if [[ -n "$TOKEN" ]] && respuesta=$(curl -fsS --max-time 15 "$API_TELEGRAM/bot$TOKEN/getMe" 2>/dev/null); then
       BOT_USUARIO=$(json 'd["result"]["username"]' <<<"$respuesta")
@@ -98,14 +106,14 @@ pedir_token() {
 pedir_clave() {
   local codigo
   while true; do
-    preguntar "Pega tu clave de la API de Anthropic (empieza por sk-ant-)" CLAVE
+    preguntar_secreto "Pega tu clave de la API de Anthropic (empieza por sk-ant-; no se verá en pantalla)" CLAVE
     CLAVE="${CLAVE//[[:space:]]/}"
     [[ -z "$CLAVE" ]] && continue
     codigo=$(curl -sS --max-time 15 -o /dev/null -w '%{http_code}' "$API_ANTHROPIC/v1/models" \
       -H "x-api-key: $CLAVE" -H "anthropic-version: 2023-06-01" 2>/dev/null || echo "000")
     case "$codigo" in
       200) bien "Clave válida"; return ;;
-      401|403) aviso "Anthropic rechazó esa clave. Revísala en console.anthropic.com > API Keys." ;;
+      401|403) aviso "Anthropic rechazó esa clave. Revísala en platform.claude.com > API keys." ;;
       *) aviso "No pude comprobar la clave (respuesta $codigo). La guardo igual; si falla, la cambias con: asistente config"; return ;;
     esac
   done

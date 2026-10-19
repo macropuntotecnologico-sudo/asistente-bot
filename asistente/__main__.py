@@ -22,7 +22,8 @@ def main() -> int:
         level=logging.INFO,
     )
     # httpx registra cada petición (con el token del bot en la URL): se silencia.
-    logging.getLogger("httpx").setLevel(logging.WARNING)
+    for ruidoso in ("httpx", "httpx2", "httpcore", "httpcore2"):
+        logging.getLogger(ruidoso).setLevel(logging.WARNING)
 
     try:
         cfg = configuracion.cargar()
